@@ -2,7 +2,7 @@ name: Build geoip files
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 0 * * 4"
+    - cron: "20 04 * * FRI"
   push:
     branches:
       - master
@@ -23,9 +23,16 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v4
         with:
           go-version-file: ./go.mod
+      
+      - name: Set timezone to WIB Jakarta
+        uses: szenius/set-timezone@v1.1
+        with:
+          timezoneLinux: "Asia/Jakarta"
+          timezoneMacos: "Asia/Jakarta"
+          timezoneWindows: "Indonesia Standard Time"
 
       - name: Set variables
         run: |
@@ -44,6 +51,8 @@ jobs:
           curl -sSL https://www.gstatic.com/ipranges/cloud.json | jq --raw-output '.prefixes[].ipv4Prefix,.prefixes[].ipv6Prefix | select(. != null)' >> data/google
           curl -sSL https://api.fastly.com/public-ip-list | jq --raw-output '.addresses[],.ipv6_addresses[]' >> data/fastly
           curl -sSL https://ip-ranges.amazonaws.com/ip-ranges.json | jq --raw-output '.prefixes[],.ipv6_prefixes[] | select(.service == "CLOUDFRONT") | .ip_prefix,.ipv6_prefix' | grep "/" >> data/cloudfront
+          curl -sSL https://raw.githubusercontent.com/malikshi/dns_ip/main/ip-dns-nocdn-prefix.txt | grep "/" >> data/doh
+          curl -sSL https://raw.githubusercontent.com/elliotwutingfeng/Inversion-DNSBL-Blocklists/main/Google_ipv4.txt >> data/malicious
 
       - name: Get GeoLite2
         env:
@@ -124,3 +133,25 @@ jobs:
           file_glob: true
           file: ./publish/*
           tag: ${{ env.TAG_NAME }}
+      
+      - name: Delete Old Release
+        uses: dev-drprasad/delete-older-releases@v0.2.1
+        with:
+          repo: bitscoid/geoip
+          keep_latest: 1
+          delete_tag_pattern: ""
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Trigger Synch V2ray Assets
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GHA_WORKFLOW_TRIGGER }}
+          script: |
+            const result = await github.rest.actions.createWorkflowDispatch({
+              owner: 'bitscoid',
+              repo: 'bitscoid/geo-dat',
+              workflow_id: 'run.yml',
+              ref: 'master'
+            })
+            console.log(result)
