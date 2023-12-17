@@ -150,7 +150,7 @@ jobs:
           script: |
             const result = await github.rest.actions.createWorkflowDispatch({
               owner: 'bitscoid',
-              repo: 'bitscoid/geo-dat',
+              repo: 'geo-dat',
               workflow_id: 'run.yml',
               ref: 'master'
             })
